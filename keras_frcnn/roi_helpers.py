@@ -254,23 +254,23 @@ def rpn_to_roi(rpn_layer, regr_layer, C, dim_ordering, use_regr=True, max_boxes=
 
 			X, Y = np.meshgrid(np.arange(cols),np. arange(rows))
 
-			A[0, :, :, curr_layer] = X - anchor_x/2
-			A[1, :, :, curr_layer] = Y - anchor_y/2
-			A[2, :, :, curr_layer] = anchor_x
-			A[3, :, :, curr_layer] = anchor_y
+			A[0, :, :, curr_layer] = X - anchor_x/2 # ?? x array들을 설정
+			A[1, :, :, curr_layer] = Y - anchor_y/2 # ?? y array들을 설정
+			A[2, :, :, curr_layer] = anchor_x # ?? width array들을 설정
+			A[3, :, :, curr_layer] = anchor_y # ?? height array들을 설정
 
 			if use_regr:
 				A[:, :, :, curr_layer] = apply_regr_np(A[:, :, :, curr_layer], regr)
 
-			A[2, :, :, curr_layer] = np.maximum(1, A[2, :, :, curr_layer])
-			A[3, :, :, curr_layer] = np.maximum(1, A[3, :, :, curr_layer])
-			A[2, :, :, curr_layer] += A[0, :, :, curr_layer]
-			A[3, :, :, curr_layer] += A[1, :, :, curr_layer]
+			A[2, :, :, curr_layer] = np.maximum(1, A[2, :, :, curr_layer]) # ?? width가 1보다 크도록~
+			A[3, :, :, curr_layer] = np.maximum(1, A[3, :, :, curr_layer]) # ?? height가 1보다 크도록~
+			A[2, :, :, curr_layer] += A[0, :, :, curr_layer] # ?? x를 더해서 x2를 만듬
+			A[3, :, :, curr_layer] += A[1, :, :, curr_layer] # ?? y를 더해서 y2를 만듬
 
-			A[0, :, :, curr_layer] = np.maximum(0, A[0, :, :, curr_layer])
-			A[1, :, :, curr_layer] = np.maximum(0, A[1, :, :, curr_layer])
-			A[2, :, :, curr_layer] = np.minimum(cols-1, A[2, :, :, curr_layer])
-			A[3, :, :, curr_layer] = np.minimum(rows-1, A[3, :, :, curr_layer])
+			A[0, :, :, curr_layer] = np.maximum(0, A[0, :, :, curr_layer]) # 0보다는 크도록
+			A[1, :, :, curr_layer] = np.maximum(0, A[1, :, :, curr_layer]) # 0보다는 크도록
+			A[2, :, :, curr_layer] = np.minimum(cols-1, A[2, :, :, curr_layer]) # 이미지 width보다는 작도록
+			A[3, :, :, curr_layer] = np.minimum(rows-1, A[3, :, :, curr_layer]) # 이미지 height보다는 작도록
 
 			curr_layer += 1
 

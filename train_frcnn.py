@@ -178,13 +178,43 @@ for epoch_num in range(num_epochs):
 				if mean_overlapping_bboxes == 0:
 					print('RPN is not producing bounding boxes that overlap the ground truth boxes. Check RPN settings or keep training.')
 
+			'''
+			X - image
+			Y - [y_rpn_cls, y_rpn_regr]
+			img_data - image data
+
+			data_gen_train 에서 전달되는 위의 값들은 positive, nagative 정보들이 들어있다.
+			'''
 			X, Y, img_data = next(data_gen_train)
-
+			# model_rpn을 학습시킴
 			loss_rpn = model_rpn.train_on_batch(X, Y)
-
+			# model_rpn predict
 			P_rpn = model_rpn.predict_on_batch(X)
+			'''
+			rpn_to_roi 설명 : 
+			1.P_rpn[rpn_layer, regr_layer]에서 윈도우 밖으로 나간 영역에 대하여 보정하고,
+			2.적정하지 않은 값들 boxes삭제 (사각형을 이루지 못하는 값들은 제외)
+			3.nms를 통해 max_boxes의 개수를 갖는 boxes 뽑아낸다 (통합 및 정렬(rpn_layer에 의해)한다.)
+			4.3번에서 뽑힌 최종 결과를 리턴 (R에 할당)
 
+			@return R - [boxes, probs]
+			'''
 			R = roi_helpers.rpn_to_roi(P_rpn[0], P_rpn[1], C, K.image_dim_ordering(), use_regr=True, overlap_thresh=0.7, max_boxes=300)
+
+			'''
+			calc_iou 설명 : 
+
+			R의 모든 box들과 img_data boxes를 비교하여, R의 box들이 어떤 정답(img_data) box들과 연관되어 있는 결정한다.
+			1.min암계값 이하 iou값을 가지는 boxes는 제외
+			2.{min < iou < max} 는 bg로 hard negative로 처리
+			3.{max > iou{} 는 정답과 매칭되는 정보를 넣어준다
+
+			X2 - 2번과 3번에서 추출된 rios[x1, y1, w, h]
+			Y1 - 매칭되는 정답 y_class_num
+			Y2 - 매칭되는 coords의 regression 데이타들
+				y_class_regr_label('bg'인 경우 [0,0,0,0] 아닌 경우 [1,1,1,1]), y_class_regr_coords[sx*tx, sy*ty, sw*tw, sh*th] -> 회귀식인듯
+			IouS - 디버깅용 데이타
+			'''
 			# note: calc_iou converts from (x1,y1,x2,y2) to (x,y,w,h) format
 			X2, Y1, Y2, IouS = roi_helpers.calc_iou(R, img_data, C, class_mapping)
 
@@ -209,6 +239,9 @@ for epoch_num in range(num_epochs):
 			rpn_accuracy_rpn_monitor.append(len(pos_samples))
 			rpn_accuracy_for_epoch.append((len(pos_samples)))
 
+			'''
+			num_rois > 1보다 클 경우, positive sample을 우선 num_rois의 (대략)반을 뽑고, 나머지는 (대략)반은 negative sample로 채운다.
+			'''
 			if C.num_rois > 1:
 				if len(pos_samples) < C.num_rois//2:
 					selected_pos_samples = pos_samples.tolist()
@@ -229,8 +262,13 @@ for epoch_num in range(num_epochs):
 				else:
 					sel_samples = random.choice(pos_samples)
 
+			'''
+			model_classifier 학습
+			sel_samples를 이용하여 학습한다.
+			'''
 			loss_class = model_classifier.train_on_batch([X, X2[:, sel_samples, :]], [Y1[:, sel_samples, :], Y2[:, sel_samples, :]])
 
+			# 이하 로직은 결과값을 추출하는 로직임.
 			losses[iter_num, 0] = loss_rpn[1]
 			losses[iter_num, 1] = loss_rpn[2]
 
